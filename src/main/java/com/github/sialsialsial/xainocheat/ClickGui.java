@@ -440,19 +440,28 @@ public class ClickGui extends GuiScreen {
         if (autototem != null && autototem.isEnabled()) {
             if (mc.player.openContainer == mc.player.inventoryContainer) {
                 ItemStack offhand = mc.player.getHeldItemOffhand();
+                ItemStack cursor = mc.player.inventory.getItemStack();
+                if (!cursor.isEmpty() && cursor.getItem() == Items.TOTEM_OF_UNDYING) {
+                    mc.playerController.windowClick(0, 45, 0, ClickType.PICKUP, mc.player);
+                    mc.playerController.updateController();
+                    return;
+                }
+                
                 if (offhand.isEmpty() || offhand.getItem() != Items.TOTEM_OF_UNDYING) {
-                    int totemSlot = findTotemSlot();
-                    if (totemSlot != -1) {
-                        mc.playerController.windowClick(0, totemSlot, 0, ClickType.PICKUP, mc.player);
-                        mc.playerController.windowClick(0, 45, 0, ClickType.PICKUP, mc.player);
-                            if (!mc.player.inventory.getItemStack().isEmpty()) {
+                    if (cursor.isEmpty()) {
+                        int totemSlot = findTotemSlot();
+                        if (totemSlot != -1) {
                             mc.playerController.windowClick(0, totemSlot, 0, ClickType.PICKUP, mc.player);
+                            mc.playerController.windowClick(0, 45, 0, ClickType.PICKUP, mc.player);
+                            if (!mc.player.inventory.getItemStack().isEmpty()) {
+                                mc.playerController.windowClick(0, totemSlot, 0, ClickType.PICKUP, mc.player);
+                            }
+                            mc.playerController.updateController();
                         }
                     }
                 }
             }
         }
-    }
 
         // ESP
         @SubscribeEvent
