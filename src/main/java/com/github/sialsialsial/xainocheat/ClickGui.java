@@ -10,6 +10,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.inventory.ClickType;
+import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.item.ItemElytra;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
@@ -68,6 +70,7 @@ public class ClickGui extends GuiScreen {
             add(new Module("JumpHack", Category.MOVEMENT));
             add(new Module("Fly", Category.MOVEMENT));
             add(new Module("NoFall", Category.MOVEMENT));
+            add(new Module("ElytraFly", Category.MOVEMENT));
 
             add(new Module("ESP", Category.RENDER));
             add(new Module("FullBright", Category.RENDER));
@@ -213,11 +216,14 @@ public class ClickGui extends GuiScreen {
         private float normalGamma = -1.0F;
         private long lastAttackTime = 0;
         private int lastSlot = -1; // Added for Scaffold
+        // Added for ElytraFly
+        private boolean isWearingElytra(EntityPlayer player) {
+            return player.getItemStackFromSlot(EntityEquipmentSlot.CHEST).getItem() instanceof ItemElytra;
+        }
         public static void register() {
             MinecraftForge.EVENT_BUS.register(new TickHandler());
         }
 
-        // Вынесено из onClientTick — исправление ошибки компиляции
         private int findBlockSlot() {
             for (int i = 0; i < 9; i++) {
                 ItemStack stack = mc.player.inventory.getStackInSlot(i);
@@ -244,6 +250,7 @@ public class ClickGui extends GuiScreen {
             Module fly   = ModuleManager.getByName("Fly");
             Module killaura = ModuleManager.getByName("KillAura");
             Module scaffold = ModuleManager.getByName("Scaffold"); // Added for Scaffold
+            Module elytrafly = ModuleManager.getByName("ElytraFly"); // Added for ElytraFly
 
             // FullBright
             if (fullbright != null && fullbright.isEnabled()) {
@@ -292,7 +299,7 @@ public class ClickGui extends GuiScreen {
                 mc.player.motionY = my;
                 mc.player.motionZ = mz;
             }
-            // Added: KillAura
+            // KillAura
             if (killaura != null && killaura.isEnabled()) {
                 long now = System.currentTimeMillis();
                 if (now - lastAttackTime >= 100) {
@@ -366,8 +373,21 @@ public class ClickGui extends GuiScreen {
                 }
             }
         }
-
-        } // конец onClientTick
+        // Added: ElytraFly
+            if (elytrafly != null && elytrafly.isEnabled()) {
+                if (isWearingElytra(mc.player)) {
+                    if (!mc.player.isElytraFlying()) {
+                    mc.player.setElytraFlying();
+                }
+                if (isWearingElytra(mc.player)) {
+                    if (!mc.player.isElytraFlying()) {
+                        if (!mc.player.onGround) {
+                            mc.player.setElytraFlying();
+                        }
+                    }
+                }
+            }
+        }
 
         // ESP
         @SubscribeEvent
