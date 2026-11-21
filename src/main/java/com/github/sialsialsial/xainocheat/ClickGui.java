@@ -18,6 +18,7 @@ import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.network.play.client.CPacketEntityAction;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingFallEvent;
@@ -374,20 +375,49 @@ public class ClickGui extends GuiScreen {
             }
         }
         // Added: ElytraFly
-            if (elytrafly != null && elytrafly.isEnabled()) {
-                if (isWearingElytra(mc.player)) {
-                    if (!mc.player.isElytraFlying()) {
-                    mc.player.setElytraFlying();
+        if (elytrafly != null && elytrafly.isEnabled()) {
+            ItemStack chest = mc.player.getItemStackFromSlot(EntityEquipmentSlot.CHEST);
+            if (chest.getItem() instanceof ItemElytra && ItemElytra.isUsable(chest)) {
+                if (!mc.player.isElytraFlying() && !mc.player.onGround && mc.player.motionY < 0.0) {
+                    mc.player.connection.sendPacket(
+                        new CPacketEntityAction(mc.player, CPacketEntityAction.Action.START_FALL_FLYING)
+                    );
                 }
-                if (isWearingElytra(mc.player)) {
-                    if (!mc.player.isElytraFlying()) {
-                        if (!mc.player.onGround) {
-                            mc.player.setElytraFlying();
-                        }
+
+                if (mc.player.isElytraFlying()) {
+                    float yaw = (float) Math.toRadians(mc.player.rotationYaw);
+                    double speed = 1.2;
+                    double mx = 0.0;
+                    double my = 0.0;
+                    double mz = 0.0;
+
+                    if (mc.gameSettings.keyBindJump.isKeyDown()) my = 0.6;
+                    if (mc.gameSettings.keyBindSneak.isKeyDown()) my = -0.6;
+
+                    if (mc.gameSettings.keyBindForward.isKeyDown()) {
+                        mx -= Math.sin(yaw) * speed;
+                        mz += Math.cos(yaw) * speed;
                     }
+                    if (mc.gameSettings.keyBindBack.isKeyDown()) {
+                        mx += Math.sin(yaw) * speed;
+                        mz -= Math.cos(yaw) * speed;
+                    }
+                    if (mc.gameSettings.keyBindLeft.isKeyDown()) {
+                        mx += Math.cos(yaw) * speed;
+                        mz += Math.sin(yaw) * speed;
+                    }
+                    if (mc.gameSettings.keyBindRight.isKeyDown()) {
+                        mx -= Math.cos(yaw) * speed;
+                        mz -= Math.sin(yaw) * speed;
+                    }
+
+                    mc.player.motionX = mx;
+                    mc.player.motionY = my;
+                    mc.player.motionZ = mz;
                 }
             }
         }
+    }
 
         // ESP
         @SubscribeEvent
