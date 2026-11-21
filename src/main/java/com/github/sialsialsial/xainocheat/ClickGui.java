@@ -11,6 +11,7 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.EntityEquipmentSlot;
+import net.minecraft.init.Items;
 import net.minecraft.item.ItemElytra;
 
 import net.minecraft.client.Minecraft;
@@ -67,6 +68,7 @@ public class ClickGui extends GuiScreen {
         public static void init() {
             if (!modules.isEmpty()) return;
             add(new Module("KillAura", Category.COMBAT));
+            add(new Module("AutoTotem", Category.COMBAT));
 
             add(new Module("JumpHack", Category.MOVEMENT));
             add(new Module("Fly", Category.MOVEMENT));
@@ -240,6 +242,22 @@ public class ClickGui extends GuiScreen {
             }
             return -1;
         }
+        // Added for AutoTotem
+        private int findTotemSlot() {
+            for (int i = 9; i < 36; i++) {
+                ItemStack stack = mc.player.inventory.getStackInSlot(i);
+                if (!stack.isEmpty() && stack.getItem() == Items.TOTEM_OF_UNDYING) {
+                    return i;
+                }
+            }
+            for (int i = 0; i < 9; i++) {
+                ItemStack stack = mc.player.inventory.getStackInSlot(i);
+                if (!stack.isEmpty() && stack.getItem() == Items.TOTEM_OF_UNDYING) {
+                    return i + 36;
+                }
+            }
+            return -1;
+        }
 
         @SubscribeEvent
         public void onClientTick(TickEvent.ClientTickEvent event) {
@@ -252,6 +270,7 @@ public class ClickGui extends GuiScreen {
             Module killaura = ModuleManager.getByName("KillAura");
             Module scaffold = ModuleManager.getByName("Scaffold"); // Added for Scaffold
             Module elytrafly = ModuleManager.getByName("ElytraFly"); // Added for ElytraFly
+            Module autototem = ModuleManager.getByName("AutoTotem"); // Added for AutoTotem
 
             // FullBright
             if (fullbright != null && fullbright.isEnabled()) {
@@ -414,6 +433,22 @@ public class ClickGui extends GuiScreen {
                     mc.player.motionX = mx;
                     mc.player.motionY = my;
                     mc.player.motionZ = mz;
+                }
+            }
+        }
+        // AutoTotem
+        if (autototem != null && autototem.isEnabled()) {
+            if (mc.player.openContainer == mc.player.inventoryContainer) {
+                ItemStack offhand = mc.player.getHeldItemOffhand();
+                if (offhand.isEmpty() || offhand.getItem() != Items.TOTEM_OF_UNDYING) {
+                    int totemSlot = findTotemSlot();
+                    if (totemSlot != -1) {
+                        mc.playerController.windowClick(0, totemSlot, 0, ClickType.PICKUP, mc.player);
+                        mc.playerController.windowClick(0, 45, 0, ClickType.PICKUP, mc.player);
+                            if (!mc.player.inventory.getItemStack().isEmpty()) {
+                            mc.playerController.windowClick(0, totemSlot, 0, ClickType.PICKUP, mc.player);
+                        }
+                    }
                 }
             }
         }
