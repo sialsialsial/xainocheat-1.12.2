@@ -1,15 +1,15 @@
 [
 	{
-		"modid": "samplemod112",
-		"name": "Sample Mod 1.12",
-		"description": "Sample mod for 1.12.2, using ForgeGradle 5.1.",
+		"modid": "xainocheat",
+		"name": "XainoCheat 1.12.2",
+		"description": "Ximplest for 1.12.2",
 		"version": "${version}",
 		"mcversion": "1.12.2",
-		"url": "",
+		"url": "https://github.com/sialsialsial/xainocheat-1.12.2/",
 		"updateUrl": "",
-		"authorList": ["You!"],
+		"authorList": ["sialsialsial"],
 		"credits": "",
-		"logoFile": "",
+		"logoFile": "icon.jpg",
 		"screenshots": [],
 		"dependencies": []
 	}
