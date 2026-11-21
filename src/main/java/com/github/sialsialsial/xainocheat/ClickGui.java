@@ -462,6 +462,7 @@ public class ClickGui extends GuiScreen {
                 }
             }
         }
+    }
 
         // ESP
         @SubscribeEvent
