@@ -360,7 +360,7 @@ public class ClickGui extends GuiScreen {
                     if (blockSlot < 9) {
                         mc.player.inventory.currentItem = prevSlot;
                     } else {
-                        mc.playerController.windowClick(0, blockSlot, prevSlot, 2, mc.player);
+                        mc.playerController.windowClick(0, blockSlot, prevSlot, ClickType.QUICK_MOVE, mc.player);
                     }
                     mc.player.rotationPitch = prevPitch;
                 }
