@@ -17,6 +17,7 @@ import net.minecraft.item.ItemElytra;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.network.play.client.CPacketEntityAction;
@@ -320,21 +321,27 @@ public class ClickGui extends GuiScreen {
                 mc.player.motionZ = mz;
             }
             // KillAura
+            // Edited: Added entity living kick support
             if (killaura != null && killaura.isEnabled()) {
                 long now = System.currentTimeMillis();
                 if (now - lastAttackTime >= 100) {
-                    EntityPlayer target = null;
+                    EntityLivingBase target = null;
                     double closestDist = 4.0;
 
-                    for (EntityPlayer p : mc.world.playerEntities) {
-                        if (p == mc.player || p.isDead || p.getHealth() <= 0) continue;
+                    AxisAlignedBB area = mc.player.getEntityBoundingBox().grow(closestDist);
+                    List<EntityLivingBase> entities =
+                            mc.world.getEntitiesWithinAABB(EntityLivingBase.class, area);
 
-                        double dist = mc.player.getDistance(p);
+                    for (EntityLivingBase entity : entities) {
+                        if (entity == mc.player || entity.isDead || entity.getHealth() <= 0) continue;
+
+                        double dist = mc.player.getDistance(entity);
                         if (dist < closestDist) {
                             closestDist = dist;
-                            target = p;
+                            target = entity;
                         }
                     }
+
                     if (target != null) {
                         double dx = target.posX - mc.player.posX;
                         double dz = target.posZ - mc.player.posZ;
