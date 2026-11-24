@@ -13,6 +13,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
+import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.GuiScreenEvent;
 import net.minecraftforge.client.event.MouseEvent;
@@ -65,8 +66,8 @@ public class XainoCheatMain {
     private static int iconPressMouseX = 0;
     private static int iconPressMouseY = 0;
     private static long iconPressTime = 0;
-    private static final int CLICK_DRAG_THRESHOLD = 5;   // пикселей — порог клик/драг
-    private static final long CLICK_TIME_THRESHOLD = 300; // мс — макс. время клика
+    private static final int CLICK_DRAG_THRESHOLD = 5;
+    private static final long CLICK_TIME_THRESHOLD = 300;
 
     private static final int ICON_SIZE = 32;
     private static int iconSpeedX = 1;
@@ -75,9 +76,10 @@ public class XainoCheatMain {
     private static final Minecraft mc = Minecraft.getMinecraft();
     private static JFrame frame;
 
-    // Work with data.txt
     private static File getDataFile() {
-        File dir = new File(Minecraft.getMinecraft().mcDataDir, "xainocheat");
+        File configDir = Loader.instance().getConfigDir();
+        File gameDir = configDir.getParentFile();
+        File dir = new File(gameDir, "xainocheat");
         if (!dir.exists()) dir.mkdirs();
         return new File(dir, "data.txt");
     }
@@ -119,7 +121,6 @@ public class XainoCheatMain {
         }
     }
 
-    // License`s JFrame
     private static boolean showLicenseWindow() {
         final boolean[] accepted = {false};
         final Object lock = new Object();
@@ -188,11 +189,11 @@ public class XainoCheatMain {
         if (!loadLicenseState()) {
             boolean ok = showLicenseWindow();
             if (!ok) {
+                System.out.println("[XainoCheat] License declined. Mod is disabled.");
                 return;
             }
         }
         licenseAccepted = true;
-        
         MinecraftForge.EVENT_BUS.register(this);
         ClickGui.ModuleManager.init();
         FMLCommonHandler.instance().bus().register(new ClickGui.TickHandler());
