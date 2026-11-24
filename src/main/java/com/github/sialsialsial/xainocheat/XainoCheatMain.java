@@ -27,6 +27,8 @@ import org.lwjgl.input.Mouse;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 
 @Mod(modid = "xainocheat", useMetadata = true)
 public class XainoCheatMain {
@@ -38,6 +40,18 @@ public class XainoCheatMain {
     public static boolean jumpHackEnabled = false;
     public static boolean legacyUIEnabled = false;
     public static boolean killAuraEnabled = false;
+
+    // License
+    private static boolean licenseAccepted = false;
+    private static final String LICENSE_VERSION = "1";
+
+    private static final String LICENSE_TEXT =
+        "By clicking \"Принять и продолжить\", you acknowledge that you have read and agree to the following terms.\n\n" +
+        "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, " +
+        "INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE " +
+        "AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, " +
+        "DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, " +
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
 
     // Added: statics for modmenu`s icon
 
@@ -61,8 +75,124 @@ public class XainoCheatMain {
     private static final Minecraft mc = Minecraft.getMinecraft();
     private static JFrame frame;
 
+    // Work with data.txt
+    private static File getDataFile() {
+        File dir = new File(Minecraft.getMinecraft().mcDataDir, "xainocheat");
+        if (!dir.exists()) dir.mkdirs();
+        return new File(dir, "data.txt");
+    }
+
+    private static boolean loadLicenseState() {
+        File file = getDataFile();
+        if (!file.exists()) return false;
+        try (BufferedReader r = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+            String line;
+            boolean accepted = false;
+            boolean versionOk = false;
+            while ((line = r.readLine()) != null) {
+                line = line.trim();
+                if (line.startsWith("accepted=")) {
+                    accepted = Boolean.parseBoolean(line.substring("accepted=".length()).trim());
+                } else if (line.startsWith("version=")) {
+                    versionOk = line.substring("version=".length()).trim().equals(LICENSE_VERSION);
+                }
+            }
+            return accepted && versionOk;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private static void saveLicenseState(boolean accepted) {
+        File file = getDataFile();
+        try (BufferedWriter w = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+            w.write("accepted=" + accepted);
+            w.newLine();
+            w.write("timestamp=" + System.currentTimeMillis());
+            w.newLine();
+            w.write("version=" + LICENSE_VERSION);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // License`s JFrame
+    private static boolean showLicenseWindow() {
+        final boolean[] accepted = {false};
+        final Object lock = new Object();
+
+        SwingUtilities.invokeLater(() -> {
+            JFrame f = new JFrame("Условия");
+            f.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+            f.setSize(560, 460);
+            f.setLayout(new BorderLayout(8, 8));
+            f.setAlwaysOnTop(true);
+
+            JTextArea textArea = new JTextArea(LICENSE_TEXT);
+            textArea.setEditable(false);
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            JScrollPane scroll = new JScrollPane(textArea);
+
+            JCheckBox agreeBox = new JCheckBox("Я ознакомился(-ась) и принимаю настоящее лицензионное соглашение");
+            agreeBox.setSelected(false);
+
+            JButton acceptBtn = new JButton("Принять и продолжить");
+            acceptBtn.setEnabled(false);
+            JButton declineBtn = new JButton("Отклонить и выйти");
+
+            agreeBox.addActionListener(e -> acceptBtn.setEnabled(agreeBox.isSelected()));
+
+            acceptBtn.addActionListener(e -> {
+                saveLicenseState(true);
+                accepted[0] = true;
+                synchronized (lock) { lock.notifyAll(); }
+                f.dispose();
+            });
+
+            declineBtn.addActionListener(e -> {
+                saveLicenseState(false);
+                accepted[0] = false;
+                synchronized (lock) { lock.notifyAll(); }
+                f.dispose();
+            });
+
+            JPanel south = new JPanel(new BorderLayout(8, 8));
+            south.add(agreeBox, BorderLayout.NORTH);
+            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            buttons.add(declineBtn);
+            buttons.add(acceptBtn);
+            south.add(buttons, BorderLayout.SOUTH);
+
+            f.add(scroll, BorderLayout.CENTER);
+            f.add(south, BorderLayout.SOUTH);
+            f.setLocationRelativeTo(null);
+            f.setVisible(true);
+        });
+
+        synchronized (lock) {
+            try { lock.wait(); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return accepted[0];
+    }
+
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
+        if (!loadLicenseState()) {
+            boolean ok = showLicenseWindow();
+            if (!ok) {
+                return;
+            }
+        }
+        licenseAccepted = true;
+        
         MinecraftForge.EVENT_BUS.register(this);
         ClickGui.ModuleManager.init();
         FMLCommonHandler.instance().bus().register(new ClickGui.TickHandler());
@@ -141,6 +271,7 @@ public class XainoCheatMain {
     // Added: The New ClickGui`s menu bind
     @SubscribeEvent
     public void onKey(InputEvent.KeyInputEvent event) {
+        if (!licenseAccepted) return;
         if (Minecraft.getMinecraft().player == null) return;
         if (!Keyboard.getEventKeyState()) return;
         int key = Keyboard.getEventKey();
@@ -148,8 +279,10 @@ public class XainoCheatMain {
             mc.displayGuiScreen(new ClickGui());
         }
     }
+
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
+        if (!licenseAccepted) return;
         if (event.phase != TickEvent.Phase.END) return;
         if (mc.player == null) return;
 
@@ -212,6 +345,7 @@ public class XainoCheatMain {
     // NoFall
     @SubscribeEvent
     public void onFall(LivingFallEvent event) {
+        if (!licenseAccepted) return;
         if (noFallEnabled && event.getEntityLiving() == mc.player) {
             event.setCanceled(true);
         }
@@ -220,6 +354,7 @@ public class XainoCheatMain {
     // ESP
     @SubscribeEvent
     public void onRenderWorldLast(RenderWorldLastEvent event) {
+        if (!licenseAccepted) return;
         if (!espEnabled || mc.world == null || mc.player == null) return;
 
         float partialTicks = event.getPartialTicks();
@@ -283,6 +418,7 @@ public class XainoCheatMain {
     // Added: drawing of modmenuicon, overlay
     @SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Post event) {
+        if (!licenseAccepted) return;
         if (event.getType() != RenderGameOverlayEvent.ElementType.ALL) return;
         if (mc.player == null) return;
 
@@ -300,6 +436,7 @@ public class XainoCheatMain {
     // Added: обработка клика для modmenuicon, subscribe event, перетаск.
     @SubscribeEvent
     public void onGuiMouseInput(GuiScreenEvent.MouseInputEvent.Pre event) {
+        if (!licenseAccepted) return;
         if (mc.player == null) return;
         if (Mouse.getEventButton() != 0) return;
 
@@ -337,6 +474,7 @@ public class XainoCheatMain {
 
     @SubscribeEvent
     public void onMouseMove(MouseEvent event) {
+        if (!licenseAccepted) return;
         if (!iconDragging) return;
         if (mc.player == null) return;
 
