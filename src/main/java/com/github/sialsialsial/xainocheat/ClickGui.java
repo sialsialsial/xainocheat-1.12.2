@@ -17,8 +17,14 @@ import net.minecraft.item.ItemElytra;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.projectile.EntityArrow;
+import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityChest;
+import net.minecraft.tileentity.TileEntityShulkerBox;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.network.play.client.CPacketEntityAction;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
@@ -493,39 +499,50 @@ public class ClickGui extends GuiScreen {
             GlStateManager.enableBlend();
             GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
             GL11.glLineWidth(2.0F);
-            GL11.glColor4f(1.0F, 0.0F, 0.0F, 1.0F);
 
             GL11.glPushMatrix();
             GL11.glTranslated(-px, -py, -pz);
 
-            for (EntityPlayer target : mc.world.playerEntities) {
-                if (target == player) continue;
+            GL11.glColor4f(0.6F, 0.0F, 1.0F, 1.0F);
+            for (TileEntity te : mc.world.loadedTileEntityList) {
+                if (te instanceof TileEntityChest || te instanceof TileEntityShulkerBox) {
+                    AxisAlignedBB box = new AxisAlignedBB(
+                        te.getPos().getX(), te.getPos().getY(), te.getPos().getZ(),
+                        te.getPos().getX() + 1, te.getPos().getY() + 1, te.getPos().getZ() + 1
+                    );
+                    drawEspBox(box);
+                }
+            }
 
-                double tx = target.lastTickPosX + (target.posX - target.lastTickPosX) * partialTicks;
-                double ty = target.lastTickPosY + (target.posY - target.lastTickPosY) * partialTicks;
-                double tz = target.lastTickPosZ + (target.posZ - target.lastTickPosZ) * partialTicks;
+            GL11.glColor4f(1.0F, 0.0F, 0.0F, 1.0F);
+            for (Entity entity : mc.world.loadedEntityList) {
+                if (entity instanceof EntityLivingBase && entity != player) {
+                    EntityLivingBase living = (EntityLivingBase) entity;
+                    if (living.isDead || living.getHealth() <= 0) continue;
 
-                AxisAlignedBB box = target.getEntityBoundingBox()
-                        .offset(tx - target.posX, ty - target.posY, tz - target.posZ)
+                    double ex = living.lastTickPosX + (living.posX - living.lastTickPosX) * partialTicks;
+                    double ey = living.lastTickPosY + (living.posY - living.lastTickPosY) * partialTicks;
+                    double ez = living.lastTickPosZ + (living.posZ - living.lastTickPosZ) * partialTicks;
+
+                    AxisAlignedBB box = living.getEntityBoundingBox()
+                        .offset(ex - living.posX, ey - living.posY, ez - living.posZ)
                         .grow(0.1, 0.1, 0.1);
+                    drawEspBox(box);
+                }
+            }
 
-                GL11.glBegin(GL11.GL_LINES);
+            GL11.glColor4f(0.0F, 1.0F, 0.0F, 1.0F);
+            for (Entity entity : mc.world.loadedEntityList) {
+                if (entity instanceof EntityItem || entity instanceof EntityArrow) {
+                    double ex = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * partialTicks;
+                    double ey = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * partialTicks;
+                    double ez = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * partialTicks;
 
-                GL11.glVertex3d(box.minX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.minY, box.minZ);
-                GL11.glVertex3d(box.maxX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.minY, box.maxZ);
-                GL11.glVertex3d(box.maxX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.minY, box.maxZ);
-                GL11.glVertex3d(box.minX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.minY, box.minZ);
-
-                GL11.glVertex3d(box.minX, box.maxY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
-                GL11.glVertex3d(box.maxX, box.maxY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
-                GL11.glVertex3d(box.maxX, box.maxY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
-                GL11.glVertex3d(box.minX, box.maxY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.minZ);
-
-                GL11.glVertex3d(box.minX, box.minY, box.minZ); GL11.glVertex3d(box.minX, box.maxY, box.minZ);
-                GL11.glVertex3d(box.maxX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
-                GL11.glVertex3d(box.maxX, box.minY, box.maxZ); GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
-                GL11.glVertex3d(box.minX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
-                GL11.glEnd();
+                    AxisAlignedBB box = entity.getEntityBoundingBox()
+                        .offset(ex - entity.posX, ey - entity.posY, ez - entity.posZ)
+                        .grow(0.1, 0.1, 0.1);
+                    drawEspBox(box);
+                }
             }
 
             GL11.glPopMatrix();
@@ -536,6 +553,25 @@ public class ClickGui extends GuiScreen {
             GlStateManager.enableDepth();
             GlStateManager.enableTexture2D();
             GlStateManager.popMatrix();
+        }
+        private void drawEspBox(AxisAlignedBB box) {
+            GL11.glBegin(GL11.GL_LINES);
+
+            GL11.glVertex3d(box.minX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.minY, box.minZ);
+            GL11.glVertex3d(box.maxX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.minY, box.maxZ);
+            GL11.glVertex3d(box.maxX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.minY, box.maxZ);
+            GL11.glVertex3d(box.minX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.minY, box.minZ);
+
+            GL11.glVertex3d(box.minX, box.maxY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
+            GL11.glVertex3d(box.maxX, box.maxY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
+            GL11.glVertex3d(box.maxX, box.maxY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
+            GL11.glVertex3d(box.minX, box.maxY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.minZ);
+
+            GL11.glVertex3d(box.minX, box.minY, box.minZ); GL11.glVertex3d(box.minX, box.maxY, box.minZ);
+            GL11.glVertex3d(box.maxX, box.minY, box.minZ); GL11.glVertex3d(box.maxX, box.maxY, box.minZ);
+            GL11.glVertex3d(box.maxX, box.minY, box.maxZ); GL11.glVertex3d(box.maxX, box.maxY, box.maxZ);
+            GL11.glVertex3d(box.minX, box.minY, box.maxZ); GL11.glVertex3d(box.minX, box.maxY, box.maxZ);
+            GL11.glEnd();
         }
 
         // NoFall
