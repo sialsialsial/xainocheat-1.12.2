@@ -86,6 +86,7 @@ public class ClickGui extends GuiScreen {
             add(new Module("FullBright", Category.RENDER));
 
             add(new Module("Scaffold", Category.WORLD));
+            add(new Module("FastUse", Category.WORLD));
         }
 
         public static void add(Module m) { modules.add(m); }
@@ -275,10 +276,16 @@ public class ClickGui extends GuiScreen {
             Module jumphack   = ModuleManager.getByName("JumpHack");
             Module fly   = ModuleManager.getByName("Fly");
             Module killaura = ModuleManager.getByName("KillAura");
-            Module scaffold = ModuleManager.getByName("Scaffold"); // Added for Scaffold
-            Module elytrafly = ModuleManager.getByName("ElytraFly"); // Added for ElytraFly
-            Module autototem = ModuleManager.getByName("AutoTotem"); // Added for AutoTotem
-
+            Module scaffold = ModuleManager.getByName("Scaffold");
+            Module elytrafly = ModuleManager.getByName("ElytraFly");
+            Module autototem = ModuleManager.getByName("AutoTotem");
+            Module fastuse = ModuleManager.getByName("FastUse"); // Added for FastUse
+            
+            // Added: FastUse
+            // FastUse
+            if (fastuse != null && fastuse.isEnabled()) {
+                mc.rightClickDelayTimer = 0;
+            }
             // FullBright
             if (fullbright != null && fullbright.isEnabled()) {
                 if (normalGamma < 0.0F) {
