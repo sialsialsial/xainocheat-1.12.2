@@ -31,6 +31,8 @@ dependencies {
 minecraft {
 	mappings channel: "stable", version: "39-1.12"
 	
+	accessTransformer = file('src/main/resources/META-INF/fastuse_at.cfg')
+	
 	runs {
 		"client" {
 			workingDirectory file("./run")
@@ -41,6 +43,12 @@ minecraft {
 			workingDirectory file("./run/server")
 			mods { "${project.name}" { source sourceSets.main } }
 		}
+	}
+}
+
+jar {
+	manifest {
+		attributes 'FMLAT': 'fastuse_at.cfg'
 	}
 }
 
