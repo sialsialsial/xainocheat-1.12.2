@@ -284,7 +284,17 @@ public class ClickGui extends GuiScreen {
             // Added: FastUse
             // FastUse
             if (fastuse != null && fastuse.isEnabled()) {
-                mc.rightClickDelayTimer = 0;
+                try {
+                    java.lang.reflect.Field f = net.minecraftforge.fml.relauncher.ReflectionHelper.findField(
+                        Minecraft.class,
+                        "rightClickDelayTimer",
+                        "field_71429_BC"
+                    );
+                    f.setAccessible(true);
+                    f.set(mc, 0);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
             // FullBright
             if (fullbright != null && fullbright.isEnabled()) {
