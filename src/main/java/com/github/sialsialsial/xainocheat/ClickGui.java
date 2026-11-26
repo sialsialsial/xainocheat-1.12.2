@@ -284,25 +284,25 @@ public class ClickGui extends GuiScreen {
             // Added: FastUse
             // FastUse
             if (fastuse != null && fastuse.isEnabled()) {
-                if (mc.gameSettings.keyBindUseItem.isKeyDown() && mc.player != null && mc.world != null) {
-                    net.minecraft.util.math.Vec3d eyePos = mc.player.getPositionEyes(1.0F);
-                    net.minecraft.util.math.Vec3d lookVec = mc.player.getLook(1.0F);
-                    net.minecraft.util.math.Vec3d reachVec = eyePos.addVector(
-                        lookVec.x * 5.0, lookVec.y * 5.0, lookVec.z * 5.0
+                if (mc.gameSettings.keyBindUseItem.isKeyDown()) {
+                    Vec3d eyePos = mc.player.getPositionEyes(1.0F);
+                    Vec3d lookVec = mc.player.getLook(1.0F);
+                    Vec3d reachVec = eyePos.add(
+                        lookVec.x * 5.0,
+                        lookVec.y * 5.0,
+                        lookVec.z * 5.0
                     );
-        
-                    net.minecraft.util.math.RayTraceResult trace = mc.world.rayTraceBlocks(
+                    RayTraceResult trace = mc.world.rayTraceBlocks(
                         eyePos, reachVec, false, false, true
                     );
-        
-                    if (trace != null && trace.typeOfHit == net.minecraft.util.math.RayTraceResult.Type.BLOCK) {
+                    if (trace != null && trace.typeOfHit == RayTraceResult.Type.BLOCK) {
                         mc.playerController.processRightClickBlock(
                             mc.player,
                             mc.world,
                             trace.getBlockPos(),
                             trace.sideHit,
-                            trace.hitVec,  // важно
-                            net.minecraft.util.EnumHand.MAIN_HAND
+                            trace.hitVec,
+                            EnumHand.MAIN_HAND
                         );
                     }
                 }
