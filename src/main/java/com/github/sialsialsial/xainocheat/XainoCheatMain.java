@@ -2,6 +2,8 @@ package com.github.sialsialsial.xainocheat;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.util.ResourceLocation;
 
@@ -43,16 +45,16 @@ public class XainoCheatMain {
     public static boolean killAuraEnabled = false;
 
     // License
-    private static boolean licenseAccepted = false;
+    public static boolean licenseAccepted = false;
     private static final String LICENSE_VERSION = "1";
 
     private static final String LICENSE_TEXT =
-        "By clicking \"Принять и продолжить\", you acknowledge that you have read and agree to the following terms.\n\n" +
         "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, " +
         "INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE " +
         "AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, " +
         "DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, " +
-        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n" +
+        "By clicking \"Принять\", you acknowledge that you have read and agree to the following terms.";
 
     // Added: statics for modmenu`s icon
 
@@ -75,6 +77,59 @@ public class XainoCheatMain {
 
     private static final Minecraft mc = Minecraft.getMinecraft();
     private static JFrame frame;
+
+    // License screen
+    public static class LicenseGui extends GuiScreen {
+        private final GuiScreen parentScreen;
+
+        public LicenseGui(GuiScreen parent) {
+            this.parentScreen = parent;
+        }
+
+        @Override
+        public void initGui() {
+            this.buttonList.clear();
+            int centerX = this.width / 2;
+            int centerY = this.height / 2;
+            this.buttonList.add(new GuiButton(0, centerX - 100, centerY + 50, 95, 20, "Принять"));
+            this.buttonList.add(new GuiButton(1, centerX + 5, centerY + 50, 95, 20, "Отклонить"));
+        }
+
+        @Override
+        public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+            this.drawDefaultBackground();
+            int textY = 20;
+            for (String line : this.fontRenderer.listFormattedStringToWidth(LICENSE_TEXT, this.width - 40)) {
+                this.drawCenteredString(this.fontRenderer, line, this.width / 2, textY, 0xFFFFFF);
+                textY += this.fontRenderer.FONT_HEIGHT + 2;
+            }
+            super.drawScreen(mouseX, mouseY, partialTicks);
+        }
+
+        @Override
+        protected void actionPerformed(GuiButton button) throws IOException {
+            if (button.id == 0) {
+                licenseAccepted = true;
+                saveLicenseState(true);
+                this.mc.displayGuiScreen(this.parentScreen);
+            } else if (button.id == 1) {
+                licenseAccepted = false;
+                saveLicenseState(false);
+                this.mc.displayGuiScreen(null);
+            }
+        }
+
+        @Override
+        public boolean doesGuiPauseGame() {
+            return false;
+        }
+
+        @Override
+        protected void keyTyped(char typedChar, int keyCode) throws IOException {
+            if (keyCode == Keyboard.KEY_ESCAPE) return;
+            super.keyTyped(typedChar, keyCode);
+        }
+    }
 
     private static File getDataFile() {
         File configDir = Loader.instance().getConfigDir();
@@ -121,79 +176,12 @@ public class XainoCheatMain {
         }
     }
 
-    private static boolean showLicenseWindow() {
-        final boolean[] accepted = {false};
-        final Object lock = new Object();
-
-        SwingUtilities.invokeLater(() -> {
-            JFrame f = new JFrame("Условия");
-            f.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            f.setSize(560, 460);
-            f.setLayout(new BorderLayout(8, 8));
-            f.setAlwaysOnTop(true);
-
-            JTextArea textArea = new JTextArea(LICENSE_TEXT);
-            textArea.setEditable(false);
-            textArea.setLineWrap(true);
-            textArea.setWrapStyleWord(true);
-            textArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
-            JScrollPane scroll = new JScrollPane(textArea);
-
-            JCheckBox agreeBox = new JCheckBox("Я ознакомился(-ась) и принимаю настоящее лицензионное соглашение");
-            agreeBox.setSelected(false);
-
-            JButton acceptBtn = new JButton("Принять и продолжить");
-            acceptBtn.setEnabled(false);
-            JButton declineBtn = new JButton("Отклонить и выйти");
-
-            agreeBox.addActionListener(e -> acceptBtn.setEnabled(agreeBox.isSelected()));
-
-            acceptBtn.addActionListener(e -> {
-                saveLicenseState(true);
-                accepted[0] = true;
-                synchronized (lock) { lock.notifyAll(); }
-                f.dispose();
-            });
-
-            declineBtn.addActionListener(e -> {
-                saveLicenseState(false);
-                accepted[0] = false;
-                synchronized (lock) { lock.notifyAll(); }
-                f.dispose();
-            });
-
-            JPanel south = new JPanel(new BorderLayout(8, 8));
-            south.add(agreeBox, BorderLayout.NORTH);
-            JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            buttons.add(declineBtn);
-            buttons.add(acceptBtn);
-            south.add(buttons, BorderLayout.SOUTH);
-
-            f.add(scroll, BorderLayout.CENTER);
-            f.add(south, BorderLayout.SOUTH);
-            f.setLocationRelativeTo(null);
-            f.setVisible(true);
-        });
-
-        synchronized (lock) {
-            try { lock.wait(); } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return false;
-            }
-        }
-        return accepted[0];
-    }
-
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        if (!loadLicenseState()) {
-            boolean ok = showLicenseWindow();
-            if (!ok) {
-                System.out.println("[XainoCheat] License declined. Mod is disabled.");
-                return;
-            }
+        if (loadLicenseState()) {
+            licenseAccepted = true;
         }
-        licenseAccepted = true;
+
         MinecraftForge.EVENT_BUS.register(this);
         ClickGui.ModuleManager.init();
         FMLCommonHandler.instance().bus().register(new ClickGui.TickHandler());
@@ -283,9 +271,17 @@ public class XainoCheatMain {
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (!licenseAccepted) return;
         if (event.phase != TickEvent.Phase.END) return;
-        if (mc.player == null) return;
+        if (mc.player == null || mc.world == null) return;
+
+        if (!licenseAccepted && mc.currentScreen == null) {
+            if (loadLicenseState()) {
+                licenseAccepted = true;
+            } else {
+                mc.displayGuiScreen(new LicenseGui(null));
+            }
+        }
+        if (!licenseAccepted) return;
 
         // Fly & CreativeFly & JumpHack
         // Now swing click-gui are legacy
