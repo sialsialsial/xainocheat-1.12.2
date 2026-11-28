@@ -13,6 +13,7 @@ import net.minecraft.inventory.ClickType;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemElytra;
+import net.minecraft.util.ChatAllowedCharacters;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
@@ -33,6 +34,7 @@ import net.minecraftforge.event.entity.living.LivingFallEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.input.Keyboard;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,11 +42,48 @@ import java.util.List;
 
 public class ClickGui extends GuiScreen {
 
+    // "API" of setting(s) for module(s)
+    public static abstract class Setting {
+        public final String name;
+        public Setting(String name) { this.name = name; }
+        public abstract int getHeight();
+    }
+
+    public static class SliderSetting extends Setting {
+        public double value;
+        public final double min, max;
+        public boolean dragging = false;
+        public SliderSetting(String name, double value, double min, double max) {
+            super(name);
+            this.value = value;
+            this.min = min;
+            this.max = max;
+        }
+        @Override public int getHeight() { return 24; }
+    }
+
+    public static class TextFieldSetting extends Setting {
+        public String text;
+        public boolean focused = false;
+        public TextFieldSetting(String name, String text) {
+            super(name);
+            this.text = text;
+        }
+        @Override public int getHeight() { return 22; }
+    }
+
+    public static class TextSetting extends Setting {
+        public TextSetting(String name) { super(name); }
+        @Override public int getHeight() { return 12; }
+    }
+
     // Module
     public static class Module {
         public final String name;
         public final Category category;
         private boolean enabled;
+        public final List<Setting> settings = new ArrayList<>();
+        public boolean expanded = false;
 
         public Module(String name, Category category) {
             this.name = name;
@@ -77,8 +116,12 @@ public class ClickGui extends GuiScreen {
             add(new Module("KillAura", Category.COMBAT));
             add(new Module("AutoTotem", Category.COMBAT));
 
+            Module fly = new Module("Fly", Category.MOVEMENT);
+            fly.settings.add(new TextSetting("Speed"));
+            fly.settings.add(new SliderSetting("Speed", 0.8, 0.1, 3.0));
+            fly.settings.add(new TextFieldSetting("Mode", "Vanilla"));
+            add(fly);
             add(new Module("JumpHack", Category.MOVEMENT));
-            add(new Module("Fly", Category.MOVEMENT));
             add(new Module("NoFall", Category.MOVEMENT));
             add(new Module("ElytraFly", Category.MOVEMENT));
 
@@ -162,23 +205,58 @@ public class ClickGui extends GuiScreen {
                         m.isEnabled() ? 0xFF2ECC71 : 0xFF555555);
                 fontRenderer.drawString(m.name, panel.x + 7, y + 3,
                         m.isEnabled() ? 0xFFFFFFFF : 0xFFAAAAAA);
+                fontRenderer.drawString(m.expanded ? "-" : "+",
+                        panel.x + PANEL_WIDTH - 10, y + 3, 0xFFAAAAAA);
                 y += ROW_HEIGHT;
+
+                if (m.expanded) {
+                    for (Setting s : m.settings) {
+                        if (s instanceof TextSetting) {
+                            fontRenderer.drawString(s.name, panel.x + 7, y + 2, 0xFFCCCCCC);
+                            y += s.getHeight();
+                        } else if (s instanceof SliderSetting) {
+                            SliderSetting slider = (SliderSetting) s;
+                            drawRect(panel.x + 5, y + 2, panel.x + PANEL_WIDTH - 5, y + 10, 0xFF333333);
+                            double ratio = (slider.value - slider.min) / (slider.max - slider.min);
+                            int fillWidth = (int) ((PANEL_WIDTH - 10) * ratio);
+                            drawRect(panel.x + 5, y + 2, panel.x + 5 + fillWidth, y + 10, 0xFF2ECC71);
+                            fontRenderer.drawString(String.format("%.2f", slider.value),
+                                    panel.x + 7, y + 12, 0xFFFFFFFF);
+                            y += s.getHeight();
+                        } else if (s instanceof TextFieldSetting) {
+                            TextFieldSetting tf = (TextFieldSetting) s;
+                            fontRenderer.drawString(s.name, panel.x + 7, y + 2, 0xFFCCCCCC);
+                            drawRect(panel.x + 5, y + 12, panel.x + PANEL_WIDTH - 5, y + 22, 0xFF222222);
+                            fontRenderer.drawString(tf.text + (tf.focused ? "_" : ""),
+                                    panel.x + 7, y + 14, 0xFFFFFFFF);
+                            y += s.getHeight();
+                        }
+                    }
+                }
             }
         }
     }
 
     @Override
     protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException {
-        if (mouseButton != 0) return;
+        if (mouseButton != 0 && mouseButton != 1) return;
+
+        for (Module m : ModuleManager.getAll()) {
+            for (Setting s : m.settings) {
+                if (s instanceof TextFieldSetting) ((TextFieldSetting) s).focused = false;
+            }
+        }
 
         for (Panel p : panels) {
             if (isHovered(mouseX, mouseY, p.x, p.y, PANEL_WIDTH, TITLE_HEIGHT)) {
-                if (isHovered(mouseX, mouseY, p.x + PANEL_WIDTH - 14, p.y, 14, TITLE_HEIGHT)) {
-                    p.expanded = !p.expanded;
-                } else {
-                    p.dragging = true;
-                    p.dragOffsetX = mouseX - p.x;
-                    p.dragOffsetY = mouseY - p.y;
+                if (mouseButton == 0) {
+                    if (isHovered(mouseX, mouseY, p.x + PANEL_WIDTH - 14, p.y, 14, TITLE_HEIGHT)) {
+                        p.expanded = !p.expanded;
+                    } else {
+                        p.dragging = true;
+                        p.dragOffsetX = mouseX - p.x;
+                        p.dragOffsetY = mouseY - p.y;
+                    }
                 }
                 return;
             }
@@ -187,10 +265,34 @@ public class ClickGui extends GuiScreen {
                 int y = p.y + TITLE_HEIGHT;
                 for (Module m : ModuleManager.getByCategory(p.category)) {
                     if (isHovered(mouseX, mouseY, p.x, y, PANEL_WIDTH, ROW_HEIGHT)) {
-                        m.toggle();
+                        if (mouseButton == 0) m.toggle();
+                        else if (mouseButton == 1) m.expanded = !m.expanded;
                         return;
                     }
                     y += ROW_HEIGHT;
+
+                    if (m.expanded) {
+                        for (Setting s : m.settings) {
+                            if (s instanceof SliderSetting) {
+                                SliderSetting slider = (SliderSetting) s;
+                                if (isHovered(mouseX, mouseY, p.x + 5, y + 2, PANEL_WIDTH - 10, 8)) {
+                                    slider.dragging = true;
+                                    updateSlider(slider, mouseX, p.x);
+                                    return;
+                                }
+                                y += s.getHeight();
+                            } else if (s instanceof TextFieldSetting) {
+                                TextFieldSetting tf = (TextFieldSetting) s;
+                                if (isHovered(mouseX, mouseY, p.x + 5, y + 12, PANEL_WIDTH - 10, 10)) {
+                                    tf.focused = true;
+                                    return;
+                                }
+                                y += s.getHeight();
+                            } else {
+                                y += s.getHeight();
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -199,6 +301,9 @@ public class ClickGui extends GuiScreen {
     @Override
     protected void mouseReleased(int mouseX, int mouseY, int state) {
         for (Panel p : panels) p.dragging = false;
+        for (Module m : ModuleManager.getAll())
+            for (Setting s : m.settings)
+                if (s instanceof SliderSetting) ((SliderSetting) s).dragging = false;
         super.mouseReleased(mouseX, mouseY, state);
     }
 
@@ -210,7 +315,44 @@ public class ClickGui extends GuiScreen {
                 p.y = mouseY - p.dragOffsetY;
             }
         }
+        for (Panel p : panels) {
+            for (Module m : ModuleManager.getByCategory(p.category)) {
+                for (Setting s : m.settings) {
+                    if (s instanceof SliderSetting && ((SliderSetting) s).dragging) {
+                        updateSlider((SliderSetting) s, mouseX, p.x);
+                    }
+                }
+            }
+        }
         super.mouseClickMove(mouseX, mouseY, clickedMouseButton, timeSinceLastClick);
+    }
+
+    private void updateSlider(SliderSetting slider, int mouseX, int panelX) {
+        int trackX = panelX + 5;
+        int trackWidth = PANEL_WIDTH - 10;
+        double ratio = (double)(mouseX - trackX) / trackWidth;
+        ratio = Math.max(0, Math.min(1, ratio));
+        slider.value = slider.min + ratio * (slider.max - slider.min);
+    }
+
+    @Override
+    protected void keyTyped(char typedChar, int keyCode) throws IOException {
+        for (Module m : ModuleManager.getAll()) {
+            for (Setting s : m.settings) {
+                if (s instanceof TextFieldSetting && ((TextFieldSetting) s).focused) {
+                    TextFieldSetting tf = (TextFieldSetting) s;
+                    if (keyCode == Keyboard.KEY_BACK) {
+                        if (tf.text.length() > 0) tf.text = tf.text.substring(0, tf.text.length() - 1);
+                    } else if (keyCode == Keyboard.KEY_RETURN) {
+                        tf.focused = false;
+                    } else if (ChatAllowedCharacters.isAllowedCharacter(typedChar)) {
+                        tf.text += typedChar;
+                    }
+                    return;
+                }
+            }
+        }
+        super.keyTyped(typedChar, keyCode);
     }
 
     private boolean isHovered(int mouseX, int mouseY, int x, int y, int w, int h) {
@@ -226,8 +368,8 @@ public class ClickGui extends GuiScreen {
         private final Minecraft mc = Minecraft.getMinecraft();
         private float normalGamma = -1.0F;
         private long lastAttackTime = 0;
-        private int lastSlot = -1; // Added for Scaffold
-        // Added for ElytraFly
+        private int lastSlot = -1;
+        // ElytraFly
         private boolean isWearingElytra(EntityPlayer player) {
             return player.getItemStackFromSlot(EntityEquipmentSlot.CHEST).getItem() instanceof ItemElytra;
         }
@@ -250,7 +392,7 @@ public class ClickGui extends GuiScreen {
             }
             return -1;
         }
-        // Added for AutoTotem
+        // AutoTotem
         private int findTotemSlot() {
             for (int i = 9; i < 36; i++) {
                 ItemStack stack = mc.player.inventory.getStackInSlot(i);
@@ -276,11 +418,11 @@ public class ClickGui extends GuiScreen {
             Module jumphack   = ModuleManager.getByName("JumpHack");
             Module fly   = ModuleManager.getByName("Fly");
             Module killaura = ModuleManager.getByName("KillAura");
-            Module scaffold = ModuleManager.getByName("Scaffold");
-            Module elytrafly = ModuleManager.getByName("ElytraFly");
-            Module autototem = ModuleManager.getByName("AutoTotem");
+            Module scaffold = ModuleManager.getByName("Scaffold"); // Added for Scaffold
+            Module elytrafly = ModuleManager.getByName("ElytraFly"); // Added for ElytraFly
+            Module autototem = ModuleManager.getByName("AutoTotem"); // Added for AutoTotem
             Module fastuse = ModuleManager.getByName("FastUse"); // Added for FastUse
-            
+
             // Added: FastUse
             // FastUse
             if (fastuse != null && fastuse.isEnabled()) {
@@ -355,7 +497,6 @@ public class ClickGui extends GuiScreen {
                 mc.player.motionZ = mz;
             }
             // KillAura
-            // Edited: Added entity living kick support
             if (killaura != null && killaura.isEnabled()) {
                 long now = System.currentTimeMillis();
                 if (now - lastAttackTime >= 100) {
@@ -395,7 +536,7 @@ public class ClickGui extends GuiScreen {
                 }
             }
 
-        // Added: Scaffold
+        // Scaffold
         if (scaffold != null && scaffold.isEnabled()) {
             int bx = MathHelper.floor(mc.player.posX);
             int by = MathHelper.floor(mc.player.posY) - 1;
@@ -434,7 +575,7 @@ public class ClickGui extends GuiScreen {
                 }
             }
         }
-        // Added: ElytraFly
+        // ElytraFly
         if (elytrafly != null && elytrafly.isEnabled()) {
             ItemStack chest = mc.player.getItemStackFromSlot(EntityEquipmentSlot.CHEST);
             if (chest.getItem() instanceof ItemElytra && ItemElytra.isUsable(chest)) {
